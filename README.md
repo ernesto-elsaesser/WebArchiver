@@ -4,7 +4,7 @@ A Swift package that compresses full web pages into single archive files that ca
 
 The main method `WebArchiver.achive(...)` takes a URL and optionally a list of cookies. The archiver will download the main HTML document and all linked HTML, CSS, JavaScript (optionally) and image resources. All resources are then packed into a single `.webarchive` file. The archiver parallelizes HTTP requests, but works on a single serial queue to process the responses.
 
-A sample project that uses the WebArchiver to save web pages offline can be found here: https://github.com/ernesto-elsaesser/OfflineWebView
+A sample project that demostrates how to combine the WebArchiver with `WKWebView` can be found here: [OfflineWebView](https://github.com/ernesto-elsaesser/OfflineWebView)
 
 ## Installation
 
