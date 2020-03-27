@@ -12,7 +12,7 @@ let package = Package(
     dependencies: [
         .package(
             url: "https://github.com/cezheng/Fuzi",
-            .branch("master")), // TODO: change to version number when latest manifest fix gets released
+            from: "3.1.2")
     ],
     targets: [
         .target(
