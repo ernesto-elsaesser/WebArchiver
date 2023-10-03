@@ -12,7 +12,7 @@ This repository is a Swift Package Manager package. Use Xcode to add it as a dep
 
 ## Motivation
 
-This package was created because `WKWebView` (in contrast to the deprecated `UIWebView`) does not offer a universal way to make arbritary web content available offline. WebKit's own HTTP caching unfortunately does provide enough control for most use cases, and a lot of stuff happens "out-of-process" (see [here](https://stackoverflow.com/questions/24208229/wkwebview-and-nsurlprotocol-not-working) or [here](https://forums.developer.apple.com/thread/53573)). 
+This package was created because `WKWebView` (in contrast to the deprecated `UIWebView`) does not offer a universal way to make arbritary web content available offline. WebKit's own HTTP caching unfortunately doesn't provide enough control for most use cases, and a lot of stuff happens "out-of-process" (see [here](https://stackoverflow.com/questions/24208229/wkwebview-and-nsurlprotocol-not-working) or [here](https://forums.developer.apple.com/thread/53573)). 
 
 But `WKWebView` can import `.webarchive` files, which are binary PLIST files following a defined (undocumented) format. Being able to create `.webarchive` therefore allows apps to save online content to offline reading. Such files can be loaded into the `WKWebView` via `loadFileURL(URL:allowingReadAccessTo:)` where URL is a `file://...` URL.
 
