@@ -1,69 +1,43 @@
-//
-//  WebArchive.swift
-//  OfflineWebView
-//
-//  Created by Ernesto Elsäßer on 11.11.18.
-//  Copyright © 2018 Ernesto Elsäßer. All rights reserved.
-//
-
 import Foundation
 
-struct WebArchive: Encodable {
-    
-    enum CodingKeys: String, CodingKey {
-        case mainResource = "WebMainResource"
-        case webSubresources = "WebSubresources"
-    }
-    
-    let mainResource: WebArchiveMainResource
-    var webSubresources: [WebArchiveResource]
-    
-    init(resource: WebArchiveResource) {
-        self.mainResource = WebArchiveMainResource(baseResource: resource)
-        self.webSubresources = []
-    }
-    
-    mutating func addSubresource(_ subresource: WebArchiveResource) {
-        self.webSubresources.append(subresource)
-    }
-}
-struct WebArchiveResource: Encodable {
+struct WebArchiveMainResource: Codable {
     
     enum CodingKeys: String, CodingKey {
         case url = "WebResourceURL"
         case data = "WebResourceData"
-        case mimeType = "WebResourceMIMEType"
+        case type = "WebResourceMIMEType"
+        case encoding = "WebResourceTextEncodingName"
+        case frame = "WebResourceFrameName"
     }
     
-    let url: URL
+    let url: String
     let data: Data
-    let mimeType: String
-
-    func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(url.absoluteString, forKey: .url)
-        try container.encode(data, forKey: .data)
-        try container.encode(mimeType, forKey: .mimeType)
-    }
+    let type: String
+    let encoding: String
+    let frame: String
 }
-struct WebArchiveMainResource: Encodable {
+
+
+struct WebArchiveResource: Codable {
     
     enum CodingKeys: String, CodingKey {
         case url = "WebResourceURL"
         case data = "WebResourceData"
-        case mimeType = "WebResourceMIMEType"
-        case textEncodingName = "WebResourceTextEncodingName"
-        case frameName = "WebResourceFrameName"
+        case type = "WebResourceMIMEType"
     }
     
-    let baseResource: WebArchiveResource
+    let url: String
+    let data: Data
+    let type: String
+}
+
+struct WebArchive: Codable {
     
-    func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(baseResource.url.absoluteString, forKey: .url)
-        try container.encode(baseResource.data, forKey: .data)
-        try container.encode(baseResource.mimeType, forKey: .mimeType)
-        try container.encode("UTF-8", forKey: .textEncodingName)
-        try container.encode("", forKey: .frameName)
+    enum CodingKeys: String, CodingKey {
+        case main = "WebMainResource"
+        case resources = "WebSubresources"
     }
+    
+    let main: WebArchiveMainResource
+    let resources: [WebArchiveResource]
 }

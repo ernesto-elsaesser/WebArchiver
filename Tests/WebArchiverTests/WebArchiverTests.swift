@@ -5,20 +5,27 @@ final class WebArchiverTests: XCTestCase {
     
     func testArchiving() {
         
-        let url = URL(string: "https://nshipster.com/wkwebview/")!
-        let expectation = self.expectation(description: "Archiving job finishes")
+        let url = URL(string: "https://webkit.org/")!
+        let decoder = PropertyListDecoder()
         
+        let expectation = self.expectation(description: "Archiving job finishes")
         WebArchiver.archive(url: url) { result in
             
             expectation.fulfill()
             
+            XCTAssertTrue(result.errors.isEmpty)
+            
             guard let data = result.plistData else {
-                XCTFail("No data returned!")
+                XCTFail("No plist data returned!")
                 return
             }
             
-            XCTAssertTrue(data.count > 0)
-            XCTAssertTrue(result.errors.isEmpty)
+            guard let archive = try? decoder.decode(WebArchive.self, from: data) else {
+                XCTFail("Plist data not decodable!")
+                return
+            }
+            
+            XCTAssertTrue(archive.resources.count > 0)
         }
         
         waitForExpectations(timeout: 60, handler: nil)

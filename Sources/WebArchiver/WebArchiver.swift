@@ -1,118 +1,159 @@
-//
-//  WebArchiver.swift
-//  OfflineWebView
-//
-//  Created by Ernesto Elsäßer on 11.11.18.
-//  Copyright © 2018 Ernesto Elsäßer. All rights reserved.
-//
-
 import Foundation
-import Fuzi
 
 public struct ArchivingResult {
-    public let plistData: Data?
-    public let errors: [Error]
+    public var plistData: Data?
+    public var errors: [ArchivingError] = []
 }
 
 public enum ArchivingError: LocalizedError {
-    case unsupportedUrl
-    case requestFailed(resource: URL, error: Error)
-    case invalidResponse(resource: URL)
-    case unsupportedEncoding
-    case invalidReferenceUrl(string: String)
+    case requestFailed(url: URL, error: Error?)
+    case encodingFailed(error: Error)
     
     public var errorDescription: String? {
         switch self {
-        case .unsupportedUrl: return "Unsupported URL"
-        case .requestFailed(let res, _): return "Failed to load " + res.absoluteString
-        case .invalidResponse(let res): return "Invalid response for " + res.absoluteString
-        case .unsupportedEncoding: return "Unsupported encoding"
-        case .invalidReferenceUrl(let string): return "Invalid reference URL: " + string
+        case .requestFailed(let url, _): return "Failed to load " + url.absoluteString
+        case .encodingFailed: return "Failed to create web archive!"
         }
     }
 }
 
 public class WebArchiver {
     
+    // Swift Regex requires iOS 16+
+    static let cssUrlRegex = try! NSRegularExpression(pattern: "url\\(['\"](.+?)['\"]\\)", options: [])
+    
     public static func archive(url: URL, cookies: [HTTPCookie] = [], includeJavascript: Bool = true, skipCache: Bool = false, completion: @escaping (ArchivingResult) -> ()) {
         
-        guard let scheme = url.scheme, scheme == "https" else {
-            let result = ArchivingResult(plistData: nil, errors: [ArchivingError.unsupportedUrl])
-            completion(result)
-            return
-        }
+        var mainResource: WebArchiveMainResource?
+        var subResources: [WebArchiveResource] = []
         
-        let cachePolicy: URLRequest.CachePolicy = skipCache ? .reloadIgnoringLocalAndRemoteCacheData : .returnCacheDataElseLoad
-        let session = ArchivingSession(cachePolicy: cachePolicy, cookies: cookies, completion: completion)
-        
-        session.load(url: url, fallback: nil) { mainResource in
+        let session = ArchivingSession(cookies: cookies, skipCache: skipCache) { errors in
             
-            var archive = WebArchive(resource: mainResource)
+            var result = ArchivingResult()
             
-            let references = try self.extractHTMLReferences(from: mainResource, includeJavascript: includeJavascript)
-            for reference in references {
+            for (url, error) in errors {
+                result.errors.append(.requestFailed(url: url, error: error))
+            }
+            
+            if let main = mainResource {
                 
-                session.load(url: reference, fallback: archive) { resource in
-                    
-                    archive.addSubresource(resource)
-                    
-                    if reference.pathExtension == "css" {
-                        
-                        let cssReferences = try self.extractCSSReferences(from: resource)
-                        for cssReference in cssReferences {
-                            
-                            session.load(url: cssReference, fallback: archive) { cssResource in
-                                
-                                archive.addSubresource(cssResource)
-                                return archive
-                            }
-                        }
-                    }
-                    
-                    return archive
+                let archive = WebArchive(main: main, resources: subResources)
+                
+                let encoder = PropertyListEncoder()
+                encoder.outputFormat = .binary
+                
+                do {
+                    result.plistData = try encoder.encode(archive)
+                } catch {
+                    result.errors.append(.encodingFailed(error: error))
                 }
             }
             
-            return archive
+            completion(result)
+        }
+        
+        session.load(url: url) { data in
+            
+            mainResource = WebArchiveMainResource(
+                url: url.absoluteString,
+                data: data,
+                type: "text/html",
+                encoding: "UTF-8",
+                frame: ""
+            )
+            
+            let imageUrls = self.extractCSSReferences(from: data, base: url)
+            for imageUrl in imageUrls {
+                session.load(url: imageUrl) { data in
+                    let resource = WebArchiveResource(
+                        url: imageUrl.absoluteString,
+                        data: data,
+                        type: "image/" + imageUrl.pathExtension
+                    )
+                    subResources.append(resource)
+                }
+            }
+            
+            let collector = ReferenceCollector()
+            let parser = XMLParser(data: data)
+            parser.delegate = collector
+            parser.parse()
+            
+            for (reference, type) in collector.references {
+                guard let refUrl = URL(string: reference, relativeTo: url) else {
+                    continue
+                }
+                
+                let mime: String
+                switch type {
+                case .css:
+                    mime = "text/css"
+                case .script:
+                    mime = "text/javascript"
+                case .image:
+                    mime = "image/" + refUrl.pathExtension
+                }
+                
+                session.load(url: refUrl) { data in
+                    let resource = WebArchiveResource(
+                        url: refUrl.absoluteString,
+                        data: data,
+                        type: mime
+                    )
+                    subResources.append(resource)
+                    
+                    if type != .css {
+                        return
+                    }
+                    
+                    let resImageUrls = self.extractCSSReferences(from: data, base: refUrl)
+                    for imageUrl in resImageUrls {
+                        session.load(url: imageUrl) { data in
+                            let resource = WebArchiveResource(
+                                url: imageUrl.absoluteString,
+                                data: data,
+                                type: "image/" + imageUrl.pathExtension
+                            )
+                            subResources.append(resource)
+                        }
+                    }
+                }
+            }
         }
     }
     
-    private static func extractHTMLReferences(from resource: WebArchiveResource, includeJavascript: Bool) throws -> Set<URL> {
-        
-        guard let htmlString = String(data: resource.data, encoding: .utf8) else {
-            throw ArchivingError.unsupportedEncoding
+    private static func guessMimeType(type: ReferenceType, url: URL) -> String {
+        switch type {
+        case .css:
+            return "text/css"
+        case .script:
+            return "text/typescript"
+        case .image:
+            return "image/" + url.pathExtension
         }
-        
-        let doc = try HTMLDocument(string: htmlString, encoding: .utf8)
-        
-        var references: [String] = []
-        references += doc.xpath("//img[@src]").compactMap{ $0["src"] } // images
-        references += doc.xpath("//link[@rel='stylesheet'][@href]").compactMap{ $0["href"] } // css
-        if includeJavascript {
-            references += doc.xpath("//script[@src]").compactMap{ $0["src"] } // javascript
-        }
-        
-        return self.absoluteUniqueUrls(references: references, resource: resource)
     }
     
-    private static func extractCSSReferences(from resource: WebArchiveResource) throws -> Set<URL> {
+    private static func extractCSSReferences(from data: Data, base: URL) -> [URL] {
         
-        guard let cssString = String(data: resource.data, encoding: .utf8) else {
-            throw ArchivingError.unsupportedEncoding
+        guard let text = String(data: data, encoding: .utf8) else {
+            return []
         }
         
-        let regex = try NSRegularExpression(pattern: "url\\(\\'(.+?)\\'\\)", options: [])
-        let fullRange = NSRange(location: 0, length: cssString.count)
-        let matches = regex.matches(in: cssString, options: [], range: fullRange)
-        
-        let objcString = cssString as NSString
-        let references = matches.map{ objcString.substring(with: $0.range(at: 1)) }
-        
-        return self.absoluteUniqueUrls(references: references, resource: resource)
-    }
-    
-    private static func absoluteUniqueUrls(references: [String], resource: WebArchiveResource) -> Set<URL> {
-        let absoluteReferences = references.compactMap { URL(string: $0, relativeTo: resource.url) }
-        return Set(absoluteReferences)
+        let fullRange = NSRange(location: 0, length: text.count)
+        let matches = cssUrlRegex.matches(in: text, options: [], range: fullRange)
+        let nsText = (text as NSString)
+        var urls: [URL] = []
+        for match in matches {
+            let nsRange = match.range(at: 1)
+            let reference = nsText.substring(with: nsRange)
+            if reference.hasPrefix("data:") {
+                continue
+            }
+            guard let url = URL(string: reference, relativeTo: base) else {
+                continue
+            }
+            urls.append(url)
+        }
+        return urls
     }
 }
