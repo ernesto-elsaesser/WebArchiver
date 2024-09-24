@@ -9,15 +9,9 @@ let package = Package(
             name: "WebArchiver",
             targets: ["WebArchiver"]),
     ],
-    dependencies: [
-        .package(
-            url: "https://github.com/cezheng/Fuzi",
-            from: "3.1.2")
-    ],
     targets: [
         .target(
-            name: "WebArchiver",
-            dependencies: ["Fuzi"]),
+            name: "WebArchiver"),
         .testTarget(
             name: "WebArchiverTests",
             dependencies: ["WebArchiver"]),
