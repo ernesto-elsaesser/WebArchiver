@@ -10,6 +10,13 @@ class ReferenceCollector: NSObject, XMLParserDelegate {
 
     var references: [String:ReferenceType] = [:]
     
+    func parse(data: Data) {
+        
+        let parser = XMLParser(data: data)
+        parser.delegate = self
+        parser.parse()
+    }
+    
     func parser(_ parser: XMLParser, didStartElement elementName: String, namespaceURI: String?, qualifiedName qName: String?, attributes attributeDict: [String : String] = [:]) {
 
         switch elementName {

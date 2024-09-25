@@ -19,8 +19,8 @@ public enum ArchivingError: LocalizedError {
 
 public class WebArchiver {
     
-    // Swift Regex requires iOS 16+
-    static let cssUrlRegex = try! NSRegularExpression(pattern: "url\\(['\"](.+?)['\"]\\)", options: [])
+    // Using NSRegularExpression as Swift Regex requires iOS 16+
+    private static let cssUrlRegex = try! NSRegularExpression(pattern: "url\\(['\"](.+?)['\"]\\)", options: [])
     
     public static func archive(url: URL, cookies: [HTTPCookie] = [], includeJavascript: Bool = true, skipCache: Bool = false, completion: @escaping (ArchivingResult) -> ()) {
         
@@ -75,15 +75,14 @@ public class WebArchiver {
             }
             
             let collector = ReferenceCollector()
-            let parser = XMLParser(data: data)
-            parser.delegate = collector
-            parser.parse()
+            collector.parse(data: data)
             
             for (reference, type) in collector.references {
                 guard let refUrl = URL(string: reference, relativeTo: url) else {
                     continue
                 }
                 
+                // guess MIME types, as MIME types from HTTP responses are even less reliable
                 let mime: String
                 switch type {
                 case .css:
@@ -119,17 +118,6 @@ public class WebArchiver {
                     }
                 }
             }
-        }
-    }
-    
-    private static func guessMimeType(type: ReferenceType, url: URL) -> String {
-        switch type {
-        case .css:
-            return "text/css"
-        case .script:
-            return "text/typescript"
-        case .image:
-            return "image/" + url.pathExtension
         }
     }
     
