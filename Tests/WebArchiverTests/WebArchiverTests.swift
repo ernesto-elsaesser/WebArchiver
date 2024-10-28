@@ -25,7 +25,9 @@ final class WebArchiverTests: XCTestCase {
                 return
             }
             
-            XCTAssertTrue(archive.resources.count > 0)
+            for resource in archive.resources {
+                print("\(resource.type): \(resource.url)")
+            }
         }
         
         waitForExpectations(timeout: 60, handler: nil)

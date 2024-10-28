@@ -5,15 +5,13 @@ import PackageDescription
 let package = Package(
     name: "WebArchiver",
     products: [
-        .library(
-            name: "WebArchiver",
-            targets: ["WebArchiver"]),
+        .library(name: "WebArchiver", targets: ["WebArchiver"]),
+    ],
+    dependencies: [
+        .package(url: "https://github.com/cezheng/Fuzi", .upToNextMajor(from: "3.1.3")),
     ],
     targets: [
-        .target(
-            name: "WebArchiver"),
-        .testTarget(
-            name: "WebArchiverTests",
-            dependencies: ["WebArchiver"]),
+        .target(name: "WebArchiver", dependencies: ["Fuzi"]),
+        .testTarget(name: "WebArchiverTests", dependencies: ["WebArchiver"]),
     ]
 )

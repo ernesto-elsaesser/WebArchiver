@@ -22,7 +22,7 @@ class ArchivingSession {
         self.completion = completion
     }
     
-    func load(url: URL, handler: @escaping (Data) -> () ) {
+    func load(url: URL, handler: @escaping (Data) throws -> () ) {
         
         if self.loadedUrls.contains(url) {
             return
@@ -40,8 +40,11 @@ class ArchivingSession {
             if let error = error {
                 self.errors[url] = error
             } else if let data = data {
-                // might trigger additional load tasks
-                handler(data)
+                do {
+                    try handler(data) // might trigger additional load tasks
+                } catch let handleError {
+                    self.errors[url] = handleError
+                }
             }
             
             self.pendingTaskCount -= 1

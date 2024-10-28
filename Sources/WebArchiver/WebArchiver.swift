@@ -1,4 +1,5 @@
 import Foundation
+import Fuzi
 
 public struct ArchivingResult {
     public var plistData: Data?
@@ -6,7 +7,7 @@ public struct ArchivingResult {
 }
 
 public enum ArchivingError: LocalizedError {
-    case requestFailed(url: URL, error: Error?)
+    case requestFailed(url: URL, error: Error)
     case encodingFailed(error: Error)
     
     public var errorDescription: String? {
@@ -74,24 +75,9 @@ public class WebArchiver {
                 }
             }
             
-            let collector = ReferenceCollector()
-            collector.parse(data: data)
+            let refTypes = try self.extractHTMLReferences(from: data, base: url, includeScripts: includeJavascript)
             
-            for (reference, type) in collector.references {
-                guard let refUrl = URL(string: reference, relativeTo: url) else {
-                    continue
-                }
-                
-                // guess MIME types, as MIME types from HTTP responses are even less reliable
-                let mime: String
-                switch type {
-                case .css:
-                    mime = "text/css"
-                case .script:
-                    mime = "text/javascript"
-                case .image:
-                    mime = "image/" + refUrl.pathExtension
-                }
+            for (refUrl, mime) in refTypes {
                 
                 session.load(url: refUrl) { data in
                     let resource = WebArchiveResource(
@@ -101,7 +87,7 @@ public class WebArchiver {
                     )
                     subResources.append(resource)
                     
-                    if type != .css {
+                    if mime != "text/css" {
                         return
                     }
                     
@@ -119,6 +105,36 @@ public class WebArchiver {
                 }
             }
         }
+    }
+    
+    private static func extractHTMLReferences(from data: Data, base: URL, includeScripts: Bool) throws -> [URL:String] {
+        
+        let doc = try HTMLDocument(data: data)
+        
+        // best guess MIME types
+        var refTypes: [URL:String] = [:]
+        
+        for node in doc.xpath("//img[@src]") {
+            if let src = node["src"], let url = URL(string: src, relativeTo: base) {
+                refTypes[url] = "image/" + url.pathExtension
+            }
+        }
+        
+        for node in doc.xpath("//link[@rel='stylesheet'][@href]") {
+            if let href = node["href"], let url = URL(string: href, relativeTo: base) {
+                refTypes[url] = "text/css"
+            }
+        }
+        
+        if includeScripts {
+            for node in doc.xpath("//script[@src]") {
+                if let src = node["src"], let url = URL(string: src, relativeTo: base) {
+                    refTypes[url] = "text/javascript"
+                }
+            }
+        }
+        
+        return refTypes
     }
     
     private static func extractCSSReferences(from data: Data, base: URL) -> [URL] {
