@@ -8,7 +8,7 @@ A sample project that demostrates how to combine the WebArchiver with `WKWebView
 
 ## Installation
 
-This repository is a Swift Package Manager package. Use Xcode to add it as a dependency. Or simply copy and paste the 4 source files into your project.
+This repository is a Swift Package Manager package. Use Xcode to add it as a dependency via `https://github.com/ernesto-elsaesser/WebArchiver`.
 
 ## Motivation
 
@@ -20,4 +20,4 @@ But `WKWebView` can import `.webarchive` files, which are binary PLIST files fol
 
 The archiver will only work well with static content. As soon as a web page needs to dynamically load resources via JavaScript, there is no sane way to archive that page into a single file without virtually replicating the backend. The archiver also doesn't scan JavaScript for statically linked resources. It does scan CSS files for image URLs though.
 
-The archiver is further limited to the common resource types of web pages, i.e. HTML, CSS, JavaScript and images. If a web page has statically linked resources of other types (i.e. audio, video, ...) these resources won't be included in the archive. If you need to support such pages, I recommend to fork the repo and extend the archiver to include the required types.
+The archiver is further limited to the common resource types of web pages, i.e. HTML, CSS, JavaScript and images. If a web page has statically linked resources of other types (i.e. audio, video, ...) these resources won't be included in the archive. If you need to support such pages, please fork the repo and extend the archiver to support the required types.
